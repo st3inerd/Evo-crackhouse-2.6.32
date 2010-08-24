@@ -53,37 +53,41 @@ static struct avs_state_s
 struct clkctl_acpu_speed {
 	unsigned acpu_khz;
 	int      vdd;
+	int	 minvdd;
 };
 
 struct clkctl_acpu_speed acpu_max_vdd_tbl[] = {
-	{  19200, 925 },
-	{ 128000, 925 },
-	{ 245000, 950 },
-//	{ 256000, 950 },
-	{ 384000, 975 },
-	{ 422400, 1000 },
-	{ 460800, 1000 },
-	{ 499200, 1050 },
-	{ 537600, 1050 },
-	{ 576000, 1050 },
-	{ 614400, 1075 },
-	{ 652800, 1100 },
-	{ 691200, 1125 },
-	{ 729600, 1150 },
-	{ 768000, 1150 },
-	{ 806400, 1175 },
-	{ 844800, 1225 },
-	{ 883200, 1250 },
-	{ 921600, 1275 },
-	{ 960000, 1275 },
-	{ 998400, 1275 },
-	{ 1036800, 1300 },
-	{ 1075200, 1300 },
-	{ 1113600, 1300 },
-	{ 1152000, 1325 },
-	{ 1190400, 1325 },
-	{ 1228800, 1350 },
-	{ 1267200, 1350 },
+/* Add a 3rd entry into the tables to hardlimit
+a minimum vdd that cannot be exceeded at a given frequency
+to prevent too-aggressive undervolting instability - netarchy */
+	{  19200, 925, 900 },
+	{ 128000, 925, 900 },
+	{ 245000, 950, 900 },
+//	{ 256000, 950, 900 },
+	{ 384000, 975, 925 },
+	{ 422400, 1000, 950 },
+	{ 460800, 1000, 950 },
+	{ 499200, 1050, 1000 },
+	{ 537600, 1050, 1000 },
+	{ 576000, 1050, 1000 },
+	{ 614400, 1075, 1025 },
+	{ 652800, 1100, 1050 },
+	{ 691200, 1125, 1075 },
+	{ 729600, 1150, 1100 },
+	{ 768000, 1150, 1100 },
+	{ 806400, 1175, 1125 },
+	{ 844800, 1225, 1175 },
+	{ 883200, 1250, 1200 },
+	{ 921600, 1275, 1225 },
+	{ 960000, 1275, 1225 },
+	{ 998400, 1275, 1225 },
+	{ 1036800, 1300, 1275 }, // Most overclocking frequencies don't get to undervolt
+	{ 1075200, 1300, 1300 }, // If you want a stable overclock, it's gonna
+	{ 1113600, 1300, 1300 }, // take more juice. -netarchy
+	{ 1152000, 1325, 1300 },
+	{ 1190400, 1325, 1325 },
+	{ 1228800, 1350, 1350 },
+	{ 1267200, 1350, 1350 },
 	{ 0 },
 };
 
@@ -176,6 +180,11 @@ static short avs_get_target_voltage(int freq_idx, bool update_table)
 	if (voltage > acpu_max_vdd_tbl[freq_idx].vdd)
 	{
 		voltage = acpu_max_vdd_tbl[freq_idx].vdd;
+	}
+	
+	if (voltage < acpu_max_vdd_tbl[freq_idx].minvdd)
+	{
+		voltage = acpu_max_vdd_tbl[freq_idx].minvdd;
 	}
 
 	return voltage;
