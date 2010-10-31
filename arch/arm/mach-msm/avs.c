@@ -1,19 +1,58 @@
 /*
  * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 and
- * only version 2 as published by the Free Software Foundation.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in the
+ *       documentation and/or other materials provided with the distribution.
+ *     * Neither the name of Code Aurora Forum nor
+ *       the names of its contributors may be used to endorse or promote
+ *       products derived from this software without specific prior written
+ *       permission.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * Alternatively, provided that this notice is retained in full, this software
+ * may be relicensed by the recipient under the terms of the GNU General Public
+ * License version 2 ("GPL") and only version 2, in which case the provisions of
+ * the GPL apply INSTEAD OF those given above.  If the recipient relicenses the
+ * software under the GPL, then the identification text in the MODULE_LICENSE
+ * macro must be changed to reflect "GPLv2" instead of "Dual BSD/GPL".  Once a
+ * recipient changes the license terms to the GPL, subsequent recipients shall
+ * not relicense under alternate licensing terms, including the BSD or dual
+ * BSD/GPL terms.  In addition, the following license statement immediately
+ * below and between the words START and END shall also then apply when this
+ * software is relicensed under the GPL:
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
- * 02110-1301, USA.
+ * START
+ *
+ * This program is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU General Public License version 2 and only version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+ * details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
+ * END
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include <linux/kernel.h>
@@ -52,19 +91,20 @@ static struct avs_state_s
 
 struct clkctl_acpu_speed {
 	unsigned acpu_khz;
-	int      vdd;
-	int	 minvdd;
+	int	 max_vdd;
+	int	 min_vdd;
 };
 
-struct clkctl_acpu_speed acpu_max_vdd_tbl[] = {
+
+struct clkctl_acpu_speed acpu_vdd_tbl[] = {
 /* Add a 3rd entry into the tables to hardlimit
 a minimum vdd that cannot be exceeded at a given frequency
 to prevent too-aggressive undervolting instability - netarchy */
-	{  19200, 925, 900 },
-	{ 128000, 925, 900 },
-	{ 245000, 950, 900 },
+	{  19200, 925, 825 },
+	{ 128000, 925, 900 }, //900
+	{ 245000, 950, 950 }, // 900
 //	{ 256000, 950, 900 },
-	{ 384000, 975, 925 },
+	{ 384000, 975, 950 }, // 925
 	{ 422400, 1000, 950 },
 	{ 460800, 1000, 950 },
 	{ 499200, 1050, 1000 },
@@ -95,7 +135,7 @@ to prevent too-aggressive undervolting instability - netarchy */
  *  Update the AVS voltage vs frequency table, for current temperature
  *  Adjust based on the AVS delay circuit hardware status
  */
-static void avs_update_voltage_table(short *vdd_table, int max_voltage_freq)
+static void avs_update_voltage_table(short *vdd_table)
 {
 	u32 avscsr;
 	int cpu;
@@ -130,20 +170,21 @@ static void avs_update_voltage_table(short *vdd_table, int max_voltage_freq)
 		AVSDEBUG("cpu=%d l2=%d vu=%d\n", cpu, l2, vu);
 		AVSDEBUG("Voltage up at %d\n", cur_freq_idx);
 
-		if (cur_voltage >= VOLTAGE_MAX)
+		if (cur_voltage >= VOLTAGE_MAX || cur_voltage >= acpu_vdd_tbl[cur_freq_idx].max_vdd)
 			printk(KERN_ERR
 				"AVS: Voltage can not get high enough!\n");
 
 		/* Raise the voltage for all frequencies */
 		for (i = 0; i < avs_state.freq_cnt; i++) {
 			vdd_table[i] = cur_voltage + VOLTAGE_STEP;
-			/*if (vdd_table[i] > VOLTAGE_MAX)
-				vdd_table[i] = VOLTAGE_MAX;*/
-			if (vdd_table[i] > max_voltage_freq)
-				vdd_table[i] = max_voltage_freq;
+			if (vdd_table[i] > VOLTAGE_MAX)
+				vdd_table[i] = VOLTAGE_MAX;
+			else if (vdd_table[i] > acpu_vdd_tbl[i].max_vdd)
+				vdd_table[i] = acpu_vdd_tbl[i].max_vdd;
 		}
 	} else if ((cpu == 1) && (l2 == 1) && (vu == 1)) {
 		if ((cur_voltage - VOLTAGE_STEP >= VOLTAGE_MIN) &&
+		    (cur_voltage - VOLTAGE_STEP >= acpu_vdd_tbl[cur_freq_idx].min_vdd) &&
 		    (cur_voltage <= vdd_table[cur_freq_idx])) {
 			vdd_table[cur_freq_idx] = cur_voltage - VOLTAGE_STEP;
 			AVSDEBUG("Voltage down for %d and lower levels\n",
@@ -164,7 +205,6 @@ static void avs_update_voltage_table(short *vdd_table, int max_voltage_freq)
  */
 static short avs_get_target_voltage(int freq_idx, bool update_table)
 {
-	int voltage = 1000;
 	unsigned cur_tempr = GET_TEMPR();
 	unsigned temp_index = cur_tempr*avs_state.freq_cnt;
 
@@ -172,24 +212,19 @@ static short avs_get_target_voltage(int freq_idx, bool update_table)
 	short *vdd_table = avs_state.avs_v + temp_index;
 
 	if (update_table)
-		avs_update_voltage_table(vdd_table, acpu_max_vdd_tbl[freq_idx].vdd);
+		avs_update_voltage_table(vdd_table);
 
-	//return vdd_table[freq_idx];
-	voltage = vdd_table[freq_idx];
-
-	if (voltage > acpu_max_vdd_tbl[freq_idx].vdd)
-	{
-		voltage = acpu_max_vdd_tbl[freq_idx].vdd;
+	if (vdd_table[freq_idx] > acpu_vdd_tbl[freq_idx].max_vdd) {
+//		pr_info("%dmV too high for %d.\n", vdd_table[freq_idx], acpu_vdd_tbl[freq_idx].acpu_khz);
+		vdd_table[freq_idx] = acpu_vdd_tbl[freq_idx].max_vdd;
 	}
-	
-	if (voltage < acpu_max_vdd_tbl[freq_idx].minvdd)
-	{
-		voltage = acpu_max_vdd_tbl[freq_idx].minvdd;
+	if (vdd_table[freq_idx] < acpu_vdd_tbl[freq_idx].min_vdd) {
+//		pr_info("%dmV too low for %d.\n", vdd_table[freq_idx], acpu_vdd_tbl[freq_idx].acpu_khz);
+		vdd_table[freq_idx] = acpu_vdd_tbl[freq_idx].min_vdd;
 	}
 
-	return voltage;
+	return vdd_table[freq_idx];
 }
-
 
 /*
  * Set the voltage for the freq_idx and optionally
@@ -197,11 +232,17 @@ static short avs_get_target_voltage(int freq_idx, bool update_table)
  */
 static int avs_set_target_voltage(int freq_idx, bool update_table)
 {
-	int rc = 0;
-	int new_voltage = avs_get_target_voltage(freq_idx, update_table);
+	int rc = 0, new_voltage;
+
+	if (freq_idx < 0 || freq_idx >= avs_state.freq_cnt) {
+		AVSDEBUG("Out of range :%d\n", freq_idx);
+		return -EINVAL;
+	}
+
+	new_voltage = avs_get_target_voltage(freq_idx, update_table);
 	if (avs_state.vdd != new_voltage) {
 		/*AVSDEBUG*/pr_info("AVS setting V to %d mV @%d MHz\n",
-			new_voltage, acpu_max_vdd_tbl[freq_idx].acpu_khz / 1000);
+			new_voltage, acpu_vdd_tbl[freq_idx].acpu_khz / 1000);
 		rc = avs_state.set_vdd(new_voltage);
 		if (rc)
 			return rc;
@@ -222,7 +263,7 @@ int avs_adjust_freq(u32 freq_idx, int begin)
 		return 0;
 	}
 
-	if (freq_idx >= avs_state.freq_cnt) {
+	if (freq_idx < 0 || freq_idx >= avs_state.freq_cnt) {
 		AVSDEBUG("Out of range :%d\n", freq_idx);
 		return -EINVAL;
 	}
@@ -249,7 +290,7 @@ aaf_out:
 
 static struct delayed_work avs_work;
 static struct workqueue_struct  *kavs_wq;
-#define AVS_DELAY ((CONFIG_HZ * 50 + 999) / 1000)
+static int delay;
 
 static void do_avs_timer(struct work_struct *work)
 {
@@ -262,14 +303,14 @@ static void do_avs_timer(struct work_struct *work)
 		avs_set_target_voltage(cur_freq_idx, 1);
 	}
 	mutex_unlock(&avs_lock);
-	queue_delayed_work_on(0, kavs_wq, &avs_work, AVS_DELAY);
+	queue_delayed_work_on(0, kavs_wq, &avs_work, delay);
 }
 
 
 static void __init avs_timer_init(void)
 {
 	INIT_DELAYED_WORK_DEFERRABLE(&avs_work, do_avs_timer);
-	queue_delayed_work_on(0, kavs_wq, &avs_work, AVS_DELAY);
+	queue_delayed_work_on(0, kavs_wq, &avs_work, delay);
 }
 
 static void __exit avs_timer_exit(void)
@@ -298,6 +339,7 @@ static void __exit avs_work_exit(void)
 int __init avs_init(int (*set_vdd)(int), u32 freq_cnt, u32 freq_idx)
 {
 	int i;
+	delay = msecs_to_jiffies(102); // 51
 
 	mutex_init(&avs_lock);
 
@@ -338,3 +380,5 @@ void __exit avs_exit()
 
 	kfree(avs_state.avs_v);
 }
+
+
