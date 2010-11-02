@@ -782,6 +782,14 @@ config MSM_CPU_AVS
 	  Qualcomm ARMv7 CPUs. It adjusts the voltage for each frequency
 	  based on feedback from three ring oscillators in the CPU.
 
+config AVS_MORE_AGGRESSIVE
+	bool "Enable aggressive undervolting (AVS)"
+	depends on (MSM_CPU_AVS)
+	default n
+	help
+	  This will enable more aggressive undervolt settings
+	  for certain frequencies when using AVS.
+
 config MSM_CPU_FREQ_ONDEMAND_MAX
 	int "Max"
 	default 384000

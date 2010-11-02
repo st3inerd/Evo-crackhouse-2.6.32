@@ -95,16 +95,16 @@ struct clkctl_acpu_speed {
 	int	 min_vdd;
 };
 
-
+#ifdef CONFIG_AVS_MORE_AGGRESSIVE
 struct clkctl_acpu_speed acpu_vdd_tbl[] = {
 /* Add a 3rd entry into the tables to hardlimit
 a minimum vdd that cannot be exceeded at a given frequency
 to prevent too-aggressive undervolting instability - netarchy */
 	{  19200, 925, 825 },
-	{ 128000, 925, 900 }, //900
-	{ 245000, 950, 950 }, // 900
+	{ 128000, 925, 900 }, 
+	{ 245000, 950, 900 }, 
 //	{ 256000, 950, 900 },
-	{ 384000, 975, 950 }, // 925
+	{ 384000, 975, 925 }, 
 	{ 422400, 1000, 950 },
 	{ 460800, 1000, 950 },
 	{ 499200, 1050, 1000 },
@@ -130,6 +130,42 @@ to prevent too-aggressive undervolting instability - netarchy */
 	{ 1267200, 1350, 1350 },
 	{ 0 },
 };
+#else
+struct clkctl_acpu_speed acpu_vdd_tbl[] = {
+/* Add a 3rd entry into the tables to hardlimit
+a minimum vdd that cannot be exceeded at a given frequency
+to prevent too-aggressive undervolting instability - netarchy */
+	{  19200, 925, 900 },
+	{ 128000, 925, 925 }, 
+	{ 245000, 950, 950 }, 
+//	{ 256000, 950, 900 },
+	{ 384000, 975, 950 }, 
+	{ 422400, 1000, 950 },
+	{ 460800, 1000, 950 },
+	{ 499200, 1050, 1000 },
+	{ 537600, 1050, 1000 },
+	{ 576000, 1050, 1000 },
+	{ 614400, 1075, 1025 },
+	{ 652800, 1100, 1050 },
+	{ 691200, 1125, 1075 },
+	{ 729600, 1150, 1100 },
+	{ 768000, 1150, 1100 },
+	{ 806400, 1175, 1125 },
+	{ 844800, 1225, 1175 },
+	{ 883200, 1250, 1200 },
+	{ 921600, 1275, 1225 },
+	{ 960000, 1275, 1225 },
+	{ 998400, 1275, 1225 },
+	{ 1036800, 1300, 1275 }, // Most overclocking frequencies don't get to undervolt
+	{ 1075200, 1300, 1300 }, // If you want a stable overclock, it's gonna
+	{ 1113600, 1300, 1300 }, // take more juice. -netarchy
+	{ 1152000, 1325, 1300 },
+	{ 1190400, 1325, 1325 },
+	{ 1228800, 1350, 1350 },
+	{ 1267200, 1350, 1350 },
+	{ 0 },
+};
+#endif
 
 /*
  *  Update the AVS voltage vs frequency table, for current temperature
