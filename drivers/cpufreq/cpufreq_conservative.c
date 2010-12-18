@@ -29,7 +29,7 @@
  * It helps to keep variable names smaller, simpler
  */
 
-#define DEF_FREQUENCY_UP_THRESHOLD		(60) // 80
+#define DEF_FREQUENCY_UP_THRESHOLD		(50) // 80
 #define DEF_FREQUENCY_DOWN_THRESHOLD		(35)
 
 /*
@@ -95,7 +95,7 @@ static struct dbs_tuners {
 	.down_threshold = DEF_FREQUENCY_DOWN_THRESHOLD,
 	.sampling_down_factor = DEF_SAMPLING_DOWN_FACTOR,
 	.ignore_nice = 0,
-	.freq_step = 15, // 5
+	.freq_step = 20, // 5
 };
 
 static inline cputime64_t get_cpu_idle_time_jiffy(unsigned int cpu,
