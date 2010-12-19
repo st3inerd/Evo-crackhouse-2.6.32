@@ -1477,13 +1477,13 @@ struct rpc_batt_mtoa_set_charging_args *args;
 args = (struct rpc_batt_mtoa_set_charging_args *)(req + 1);
 args->enable = be32_to_cpu(args->enable);
 if ((htc_batt_info.charger == LINEAR_CHARGER) && (htc_batt_info.rep.level == 100) &&
-	(htc_batt_info.rep.batt_vol >= 4199)) {
+	(htc_batt_info.rep.batt_vol >= 4220)) {
 if ((args->enable == 2) || (args->enable == 1) || (args->enable == 0))
 	args->enable = 0;
 } else
 	args->enable = 2;
 if ((htc_batt_info.charger == SWITCH_CHARGER) && (htc_batt_info.rep.level == 100) &&
-	(htc_batt_info.rep.batt_vol >= 4199)) {
+	(htc_batt_info.rep.batt_vol >= 4220)) {
 if ((args->enable == 1) || (args->enable == 2))
 	args->enable = 0;
 } else
