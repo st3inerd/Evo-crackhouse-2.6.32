@@ -1476,14 +1476,14 @@ struct rpc_batt_mtoa_set_charging_args *args;
 args = (struct rpc_batt_mtoa_set_charging_args *)(req + 1);
 args->enable = be32_to_cpu(args->enable);
 
-
+if (htc_batt_info.rep.charging_source == 2) {
 if ((htc_batt_info.charger == LINEAR_CHARGER) && (htc_batt_info.rep.level == 100) &&
 (htc_batt_info.rep.batt_vol >= 4228)) {
 if ((args->enable == 2) || (args->enable == 1) || (args->enable == 0))
 args->enable = 0;
 } else if ((htc_batt_info.charger == LINEAR_CHARGER) && (htc_batt_info.rep.level == 100) &&
 (htc_batt_info.rep.batt_vol < 4227)) {
-args->enable = 1;
+args->enable = 2;
 }
 if ((htc_batt_info.charger == SWITCH_CHARGER) && (htc_batt_info.rep.level == 100) &&
 (htc_batt_info.rep.batt_vol >= 4228)) {
@@ -1493,6 +1493,27 @@ args->enable = 0;
 (htc_batt_info.rep.batt_vol < 4227)) {
 args->enable = 2;
 }
+}
+//////////////////////USB CHARGING
+if (htc_batt_info.rep.charging_source == 1) {
+if ((htc_batt_info.charger == LINEAR_CHARGER) && (htc_batt_info.rep.level == 100) &&
+(htc_batt_info.rep.batt_vol >= 4228)) {
+if ((args->enable == 2) || (args->enable == 0))
+args->enable =0;
+} else if ((htc_batt_info.charger == LINEAR_CHARGER) && (htc_batt_info.rep.level == 100) &&
+(htc_batt_info.rep.batt_vol < 4227)) {
+args->enable = 1;
+}
+if ((htc_batt_info.charger == SWITCH_CHARGER) && (htc_batt_info.rep.level == 100) &&
+(htc_batt_info.rep.batt_vol >= 4228)) {
+if ((args->enable == 2) || (args->enable == 0))
+args->enable = 0;
+} else if ((htc_batt_info.charger == SWITCH_CHARGER) && (htc_batt_info.rep.level == 100) &&
+(htc_batt_info.rep.batt_vol < 4227)) {
+args->enable = 1;
+}
+}
+
 if (htc_batt_debug_mask & HTC_BATT_DEBUG_M2A_RPC)
 BATT_LOG("M2A_RPC: set_charging: %d", args->enable);
 if (htc_batt_info.charger == SWITCH_CHARGER)
