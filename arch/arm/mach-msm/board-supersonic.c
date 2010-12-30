@@ -1068,6 +1068,7 @@ static struct i2c_board_info i2c_devices[] = {
 	},
 
 // New Camera Stuff - netarchy
+	{
 		I2C_BOARD_INFO("s5k3h1gx",  0x20 >> 1),
 	},/*samsung for 2nd source main camera*/
 	{
