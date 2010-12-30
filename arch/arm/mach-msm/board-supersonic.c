@@ -1067,6 +1067,12 @@ static struct i2c_board_info i2c_devices[] = {
 		.irq = MSM_GPIO_TO_INT(SUPERSONIC_GPIO_COMPASS_INT_N),
 	},
 
+// New Camera Stuff - netarchy
+		I2C_BOARD_INFO("s5k3h1gx",  0x20 >> 1),
+	},/*samsung for 2nd source main camera*/
+	{
+		I2C_BOARD_INFO("s5k6aafx", 0x78 >> 1),
+	},/*samsung 2nd camera 2nd source*/
 	{
 		I2C_BOARD_INFO("ov8810", 0x6C >> 1),
 	},
@@ -1126,8 +1132,6 @@ static uint32_t camera_off_gpio_table[] = {
 	PCOM_GPIO_CFG(13, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* HSYNC */
 	PCOM_GPIO_CFG(14, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* VSYNC */
 	PCOM_GPIO_CFG(15, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* MCLK */
-	PCOM_GPIO_CFG(99, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA), /* CAM1_RST */
-	PCOM_GPIO_CFG(100, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA), /* CAM1_PWD */
 };
 
 static uint32_t camera_on_gpio_table[] = {
@@ -1185,10 +1189,10 @@ static struct msm_camera_device_platform_data msm_camera_device_data = {
 	.ioext.appsz  = MSM_CLK_CTL_SIZE,
 };
 
-static void supersonic_ov8810_clk_switch(void){
+static void supersonic_maincam_clk_switch(void){
 	int rc = 0;
-	pr_info("SuperSoinc: clk switch (supersonic)(ov8810)\n");
-	rc = gpio_request(SUPERSONIC_CLK_SWITCH, "ov8810");
+	pr_info("SuperSoinc: clk switch (supersonic)(maincam)\n");
+	rc = gpio_request(SUPERSONIC_CLK_SWITCH, "maincam");
 	if (rc < 0)
 		pr_err("GPIO (%d) request fail\n", SUPERSONIC_CLK_SWITCH);
 	else
@@ -1198,10 +1202,10 @@ static void supersonic_ov8810_clk_switch(void){
 	return;
 }
 
-static void supersonic_ov9665_clk_switch(void){
+static void supersonic_seccam_clk_switch(void){
 	int rc = 0;
-	pr_info("SuperSoinc: Doing clk switch (supersonic)(ov9665)\n");
-	rc = gpio_request(SUPERSONIC_CLK_SWITCH, "ov9665");
+	pr_info("SuperSoinc: Doing clk switch (supersonic)(2ndcam)\n");
+	rc = gpio_request(SUPERSONIC_CLK_SWITCH, "seccam");
 	if (rc < 0)
 		pr_err("GPIO (%d) request fail\n", SUPERSONIC_CLK_SWITCH);
 	else
@@ -1209,6 +1213,36 @@ static void supersonic_ov9665_clk_switch(void){
 	gpio_free(SUPERSONIC_CLK_SWITCH);
 
 	return;
+}
+
+enum msm_camera_source camera_source;
+static void supersonic_set_source(enum msm_camera_source source)
+{
+	camera_source = source;
+}
+
+enum msm_camera_source supersonic_get_source(void){
+	return camera_source;
+}
+
+static int camera_main_probed = 0;
+static int supersonic_camera_main_get_probe(void)
+{
+	return camera_main_probed;
+}
+static void supersonic_camera_main_set_probe(int probed)
+{
+	camera_main_probed = probed;
+}
+
+static int camera_sec_probed = 0;
+static int supersonic_camera_sec_get_probe(void)
+{
+	return camera_sec_probed;
+}
+static void supersonic_camera_sec_set_probe(int probed)
+{
+	camera_sec_probed = probed;
 }
 
 static int flashlight_control(int mode)
@@ -1223,11 +1257,59 @@ static struct camera_flash_cfg msm_camera_sensor_flash_cfg = {
 	.low_cap_limit		= 15,
 };
 
+/*2nd source for 2nd camera*/
+static struct msm_camera_sensor_info msm_camera_sensor_s5k6aafx_data = {
+	.sensor_name = "s5k6aafx",
+	.sensor_reset = SUPERSONIC_MAINCAM_RST,
+	.sensor_pwd = SUPERSONIC_2NDCAM_PWD,
+	.camera_clk_switch = supersonic_seccam_clk_switch,
+	.camera_main_get_probe = supersonic_camera_sec_get_probe,
+	.camera_main_set_probe = supersonic_camera_sec_get_probe,
+	.pdata = &msm_camera_device_data,
+	.resource = msm_camera_resources,
+	.num_resources = ARRAY_SIZE(msm_camera_resources),
+	.waked_up = 0,
+	.need_suspend = 0,
+};
+
+static struct platform_device msm_camera_sensor_s5k6aafx = {
+	.name	   = "msm_camera_s5k6aafx",
+	.dev	    = {
+		.platform_data = &msm_camera_sensor_s5k6aafx_data,
+	},
+};
+
+
+/*samsung for 2nd source main camera*/
+static struct msm_camera_sensor_info msm_camera_sensor_s5k3h1_data = {
+	.sensor_name    = "s5k3h1gx",
+	.sensor_reset   = SUPERSONIC_MAINCAM_RST,
+	.sensor_pwd     = SUPERSONIC_MAINCAM_PWD,
+	.camera_clk_switch	= supersonic_maincam_clk_switch,
+	.camera_set_source = supersonic_set_source,
+	.camera_main_get_probe = supersonic_camera_main_get_probe,
+	.camera_main_set_probe = supersonic_camera_main_set_probe,
+	.pdata = &msm_camera_device_data,
+	.resource = msm_camera_resources,
+	.num_resources = ARRAY_SIZE(msm_camera_resources),
+	.flash_cfg	= &msm_camera_sensor_flash_cfg,
+};
+
+static struct platform_device msm_camera_sensor_s5k3h1 = {
+    .name           = "msm_camera_s5k3h1gx",
+    .dev            = {
+    .platform_data = &msm_camera_sensor_s5k3h1_data,
+    },
+};
+
 static struct msm_camera_sensor_info msm_camera_sensor_ov8810_data = {
 	.sensor_name    = "ov8810",
-	.sensor_reset   = SUPERSONIC_MAINCAM_RST, /* CAM1_RST */
-	.sensor_pwd     = SUPERSONIC_MAINCAM_PWD,  /* CAM1_PWDN, enabled in a9 */
-	.camera_clk_switch	= supersonic_ov8810_clk_switch,
+	.sensor_reset   = SUPERSONIC_MAINCAM_RST,
+	.sensor_pwd     = SUPERSONIC_MAINCAM_PWD,
+	.camera_clk_switch	= supersonic_maincam_clk_switch,
+	.camera_set_source = supersonic_set_source,
+	.camera_main_get_probe = supersonic_camera_main_get_probe,
+	.camera_main_set_probe = supersonic_camera_main_set_probe,
 	.pdata = &msm_camera_device_data,
 	.resource = msm_camera_resources,
 	.num_resources = ARRAY_SIZE(msm_camera_resources),
@@ -1247,7 +1329,10 @@ static struct msm_camera_sensor_info msm_camera_sensor_ov9665_data = {
 	.sensor_name	= "ov9665",
 	.sensor_reset	= SUPERSONIC_MAINCAM_RST,
 	.sensor_pwd	= SUPERSONIC_2NDCAM_PWD,
-	.camera_clk_switch	= supersonic_ov9665_clk_switch,
+	.camera_clk_switch	= supersonic_seccam_clk_switch,
+	.camera_get_source = supersonic_get_source,
+	.camera_main_get_probe = supersonic_camera_sec_get_probe,
+	.camera_main_get_probe = supersonic_camera_sec_get_probe,
 	.pdata		= &msm_camera_device_data,
 	.resource = msm_camera_resources,
 	.num_resources = ARRAY_SIZE(msm_camera_resources),
@@ -1319,7 +1404,9 @@ static struct platform_device *devices[] __initdata = {
 	&android_pmem_ciq2_device,
 	&android_pmem_ciq3_device,
 #endif
+	&msm_camera_sensor_s5k3h1,
 	&msm_camera_sensor_ov8810,
+	&msm_camera_sensor_s5k6aafx,
 	&msm_kgsl_device,
 	&msm_device_i2c,
 	&msm_camera_sensor_ov9665,
