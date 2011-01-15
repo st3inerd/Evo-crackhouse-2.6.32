@@ -52,7 +52,7 @@ module_param(use_spi_crc, bool, 0);
 /*
  * Internal function. Schedule delayed work in the MMC work queue.
  */
-static int mmc_schedule_delayed_work(struct delayed_work *work,
+int mmc_schedule_delayed_work(struct delayed_work *work,
 				     unsigned long delay)
 {
 	wake_lock(&mmc_delayed_work_wake_lock);
@@ -184,6 +184,10 @@ static void mmc_wait_done(struct mmc_request *mrq)
 	complete(mrq->done_data);
 }
 
+struct msmsdcc_host;
+void msmsdcc_request_end(struct msmsdcc_host *host, struct mmc_request *mrq);
+void msmsdcc_stop_data(struct msmsdcc_host *host);
+
 /**
  *	mmc_wait_for_req - start a request and wait for completion
  *	@host: MMC host to start command
@@ -195,6 +199,10 @@ static void mmc_wait_done(struct mmc_request *mrq)
  */
 void mmc_wait_for_req(struct mmc_host *host, struct mmc_request *mrq)
 {
+#ifdef CONFIG_WIMAX
+	int ret = 0;
+#endif
+
 	DECLARE_COMPLETION_ONSTACK(complete);
 
 	mrq->done_data = &complete;
@@ -202,7 +210,20 @@ void mmc_wait_for_req(struct mmc_host *host, struct mmc_request *mrq)
 
 	mmc_start_request(host, mrq);
 
+#ifdef CONFIG_WIMAX
+	ret = wait_for_completion_timeout(&complete, msecs_to_jiffies(5000));
+	if (ret <= 0) {
+		struct msmsdcc_host *msm_host = mmc_priv(host);
+ 		printk("[ERR] %s: %s wait_for_completion_timeout!\n", __func__, mmc_hostname(host));
+		
+		msmsdcc_stop_data(msm_host);
+
+		mrq->cmd->error = -ETIMEDOUT;
+		msmsdcc_request_end(msm_host, mrq); 	
+	}
+#else
 	wait_for_completion(&complete);
+#endif		
 }
 
 EXPORT_SYMBOL(mmc_wait_for_req);
@@ -281,8 +302,9 @@ void mmc_set_data_timeout(struct mmc_data *data, const struct mmc_card *card)
 		unsigned int timeout_us, limit_us;
 
 		timeout_us = data->timeout_ns / 1000;
-		timeout_us += data->timeout_clks * 1000 /
-			(card->host->ios.clock / 1000);
+		if ((card->host->ios.clock / 1000) > 0)
+			timeout_us += data->timeout_clks * 1000 /
+				(card->host->ios.clock / 1000);
 
 		if (data->flags & MMC_DATA_WRITE)
 			/*
@@ -966,16 +988,17 @@ static inline void mmc_bus_put(struct mmc_host *host)
 
 int mmc_resume_bus(struct mmc_host *host)
 {
+	int err = 0;
 	if (!mmc_bus_needs_resume(host))
-		return -EINVAL;
+		return 0;
 
 	printk("%s: Starting deferred resume\n", mmc_hostname(host));
 	mmc_bus_get(host);
 	if (host->bus_ops && !host->bus_dead) {
 		mmc_power_up(host);
 		BUG_ON(!host->bus_ops->resume);
-		host->bus_ops->resume(host);
-		if (mmc_bus_fails_resume(host))
+		err = host->bus_ops->resume(host);
+		if (err)
 			goto end;
 	}
 
@@ -986,8 +1009,8 @@ end:
 	mmc_bus_put(host);
 	host->bus_resume_flags &= ~MMC_BUSRESUME_NEEDS_RESUME;
 	printk(KERN_INFO "%s: Deferred resume %s\n", mmc_hostname(host),
-			mmc_bus_fails_resume(host) ? "failed" : "completed");
-	return 0;
+			err ? "failed" : "completed");
+	return err;
 }
 
 EXPORT_SYMBOL(mmc_resume_bus);
@@ -1064,6 +1087,26 @@ void mmc_detect_change(struct mmc_host *host, unsigned long delay)
 }
 
 EXPORT_SYMBOL(mmc_detect_change);
+
+void mmc_remove_sd_card(struct work_struct *work)
+{
+	struct mmc_host *host =
+		container_of(work, struct mmc_host, remove.work);
+	printk(KERN_INFO "%s: %s\n", mmc_hostname(host),
+		__func__);
+	mmc_bus_get(host);
+	if (host->bus_ops && !host->bus_dead) {
+		if (host->bus_ops->remove)
+			host->bus_ops->remove(host);
+		mmc_claim_host(host);
+		mmc_detach_bus(host);
+		mmc_release_host(host);
+	}
+	mmc_bus_put(host);
+	wake_unlock(&mmc_delayed_work_wake_lock);
+	printk(KERN_INFO "%s: %s exit\n", mmc_hostname(host),
+		__func__);
+}
 
 
 void mmc_rescan(struct work_struct *work)
