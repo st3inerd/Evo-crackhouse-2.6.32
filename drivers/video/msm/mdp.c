@@ -21,6 +21,7 @@
 #include <linux/interrupt.h>
 #include <linux/wait.h>
 #include <linux/clk.h>
+#include <linux/timer.h>
 #include <linux/file.h>
 #include <linux/android_pmem.h>
 #include <linux/major.h>
@@ -35,6 +36,9 @@
 #include <asm/mach-types.h>
 
 struct class *mdp_class;
+
+/* Used to report LCDC underflows */
+void reportUnderflow(void);
 
 #define MDP_CMD_DEBUG_ACCESS_BASE (0x10000)
 
@@ -141,6 +145,13 @@ static irqreturn_t mdp_isr(int irq, void *data)
 
 //	pr_info("%s: status=%08x (irq_mask=%08x)\n", __func__, status,
 //		mdp_irq_mask);
+	
+    if (status & MDP_LCDC_UNDERFLOW)
+    {
+        pr_err("%s: LCDC Underflow\n", __func__);
+		reportUnderflow();
+    }
+    
 	status &= mdp_irq_mask;
 #ifdef CONFIG_MSM_MDP40
 	if (mdp->mdp_dev.overrides & MSM_MDP4_MDDI_DMA_SWITCH) {
@@ -435,6 +446,17 @@ static int get_img(struct mdp_img *img, struct fb_info *info,
 	struct file *file;
 	unsigned long vstart;
 
+	if (img->memory_id & 0x40000000)
+	{
+	    struct fb_info *fb = registered_fb[img->memory_id & 0x0000FFFF];
+	    if (fb)
+	    {
+		*start = fb->fix.smem_start;
+		*len = fb->fix.smem_len;
+	    }
+	    *filep = NULL;
+	    return 0;
+	}
 	if (!get_pmem_file(img->memory_id, start, &vstart, len, filep))
 		return 0;
 	else if (!get_msm_hw3d_file(img->memory_id, &img->offset, start, len,

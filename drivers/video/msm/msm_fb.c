@@ -33,10 +33,14 @@
 #include <linux/debugfs.h>
 #include <linux/dma-mapping.h>
 #include <linux/android_pmem.h>
+#include "mdp_hw.h"
 
 extern void start_drawing_late_resume(struct early_suspend *h);
 static void msmfb_resume_handler(struct early_suspend *h);
 static void msmfb_resume(struct work_struct *work);
+
+void hdmi_DoBlit(int offset);
+int hdmi_usePanelSync(void);
 
 #define MSMFB_DEBUG 1
 #ifdef CONFIG_FB_MSM_LOGO
@@ -393,19 +397,32 @@ restart:
 		msmfb->yoffset);
 	spin_unlock_irqrestore(&msmfb->update_lock, irq_flags);
 
-	/* if the panel is all the way on wait for vsync, otherwise sleep
-	 * for 16 ms (long enough for the dma to panel) and then begin dma */
-	msmfb->vsync_request_time = ktime_get();
-	if (panel->request_vsync && (sleeping == AWAKE)) {
-		wake_lock_timeout(&msmfb->idle_lock, HZ/4);
-		panel->request_vsync(panel, &msmfb->vsync_callback);
-	} else {
-		if (!hrtimer_active(&msmfb->fake_vsync)) {
-			hrtimer_start(&msmfb->fake_vsync,
-				      ktime_set(0, NSEC_PER_SEC/60),
-				      HRTIMER_MODE_REL);
-		}
-	}
+    if (!hdmi_usePanelSync())
+    {
+        msmfb->vsync_request_time = ktime_get();
+        msmfb_start_dma(msmfb);
+    }
+    else
+    {
+        /* if the panel is all the way on wait for vsync, otherwise sleep
+         * for 16 ms (long enough for the dma to panel) and then begin dma */
+        msmfb->vsync_request_time = ktime_get();
+        if (panel->request_vsync && (sleeping == AWAKE)) {
+            wake_lock_timeout(&msmfb->idle_lock, HZ/4);
+            panel->request_vsync(panel, &msmfb->vsync_callback);
+        } else {
+            if (!hrtimer_active(&msmfb->fake_vsync)) {
+                hrtimer_start(&msmfb->fake_vsync,
+                          ktime_set(0, NSEC_PER_SEC/60),
+                          HRTIMER_MODE_REL);
+            }
+        }
+    }
+
+    /* We did the DMA, now blit the data to the other display */
+    hdmi_DoBlit(msmfb->xres * msmfb->yoffset * BYTES_PER_PIXEL(msmfb));
+
+    return;
 }
 
 static void msmfb_update(struct fb_info *info, uint32_t left, uint32_t top,
