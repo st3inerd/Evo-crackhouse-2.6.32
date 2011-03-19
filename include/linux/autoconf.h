@@ -1,7 +1,7 @@
 /*
  * Automatically generated C config: don't edit
  * Linux kernel version: 2.6.32.27
- * Wed Mar 16 22:58:17 2011
+ * Fri Mar 18 19:25:41 2011
  */
 #define AUTOCONF_INCLUDED
 #define CONFIG_VIDEO_V4L1_COMPAT 1
@@ -411,7 +411,7 @@
 #define CONFIG_VIRT_TO_BUS 1
 #define CONFIG_MD 1
 #define CONFIG_MSM_MDP31 1
-#define CONFIG_LOCALVERSION "-asshole-mod-1.0-cfs-havs-sbc"
+#define CONFIG_LOCALVERSION "-asshole-mod-1.0-cfs-havs-sbc-beta"
 #define CONFIG_MEDIA_TUNER_MC44S803 1
 #define CONFIG_ZLIB_INFLATE 1
 #define CONFIG_INIT_ENV_ARG_LIMIT 32
